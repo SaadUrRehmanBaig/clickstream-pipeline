@@ -18,17 +18,13 @@
     // Track initial page view
     track('page_view');
 
-    // Track global click interactions
     document.addEventListener('click', (e) => {
-        const target = e.target.closest('a, button, [data-track]');
-        if (!target) return;
-
-        track('click', {
-            element_tag: target.tagName,
-            element_id: target.id || null,
-            element_classes: target.className || null,
-            element_text: target.innerText?.substring(0, 50) || null,
-            target_href: target.href || null
-        });
+    track('click', {
+        element_tag: e.target.tagName,
+        element_id: e.target.id || null,
+        element_classes: e.target.className || null,
+        element_text: e.target.innerText?.substring(0, 50) || null,
     });
+});
+
 })();
