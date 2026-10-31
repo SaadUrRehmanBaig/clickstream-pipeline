@@ -2,17 +2,17 @@
 
 A complete data pipeline that ingests continuous user click events, stores raw data in a Data Lake, and processes historical data nightly for consumer trends.
 
-**Tech Stack:** Python FastAPI, Apache Kafka, Apache Storm, Apache Spark , HDFS
+**Tech Stack:** Python FastAPI, Apache Kafka, Apache Storm, Apache Spark, HDFS
 
 ---
 
 ## How the tools fit together
 
-- **Data Lake / HDFS** — Raw JSON clickstream logs are dumped directly into an HDFS-backed Data Lake.
+- **Data Lake / HDFS (Bronze Layer)** — Raw JSON clickstream logs land here first, partitioned by date using Hive-style directories (`year=/month=/day=`). Nothing is transformed; it's the source of truth.
 
-- **Apache Storm (Speed Layer)** — Consumes the live clickstream stream for processing. If a user is performing some malacious activity Storm immediately flags and fires a real-time alert (sub-second latency).
+- **Apache Storm (Speed Layer / Silver)** — Consumes the live Kafka stream for real-time processing. If a user is performing malicious activity, Storm immediately flags and fires an alert (sub-second latency).
 
-- **Apache Spark (Batch Layer)** — Runs daily scheduled jobs over historical data in HDFS to build recommendation models (e.g. "People who bought X also bought Y") and aggregate daily activity reports.
+- **Apache Spark (Batch Layer / Gold)** — Runs daily scheduled jobs over historical data in HDFS to build recommendation models (e.g. "People who bought X also bought Y") and aggregate daily activity reports.
 
 ---
 
@@ -32,18 +32,32 @@ A complete data pipeline that ingests continuous user click events, stores raw d
         │
    ┌────┴────────────────────────┐
    ▼                             ▼
-[ Apache Storm ]          [ HDFS / Data Lake ]
- Real-time Fraud Layer     Batch / Bronze Layer
+[ Apache Storm ]          [ Data Lake Connector ]
+ Speed / Silver Layer      Kafka → HDFS consumer
                                 │
-                                ▼  
-                        [ Apache Spark] (batch layer)
+                                ▼
+                        [ HDFS / NameNode + DataNode ]
+                         Bronze Layer (raw NDJSON)
+                                │
+                                ▼
+                        [ Apache Spark ] (Batch / Gold Layer)
 ```
+
+---
+
+## Medallion Layers
+
+The pipeline is built incrementally across three layers:
+
+1. **Bronze** — Raw, unmodified events written to HDFS as NDJSON, partitioned by date.
+2. **Silver** — Real-time fraud detection and event enrichment via Apache Storm.
+3. **Gold** — Aggregated reports and ML features produced nightly by Apache Spark.
 
 ---
 
 ## Steps to run
 
-**1.** deploy a dummy site html, js with nginx or any server of your choice keeping in mind security.
+**1.** Deploy the dummy site (`dummy-site/index.html` + `js/tracker.js`)with nginx or any server of your choice keeping in mind security.
 
 **2.** Start the local stack — everything below runs via Docker Compose for dev ease:
 
@@ -62,3 +76,11 @@ docker compose up --build
 ```bash
 ssh -R 127.0.0.1:8080:localhost:8080 vps
 ```
+
+**5.** Events flow from Kafka into HDFS via the `data-lake-connector` service. It batches events (flush at 50 events or every 10 seconds, whichever comes first) and writes NDJSON files under:
+
+```
+/lake/raw/clickstream/year=YYYY/month=MM/day=DD/batch_<timestamp>.json
+```
+
+> **Note on production:** In a real deployment this connector would be replaced with Kafka Connect (HDFS Sink Connector) — no custom consumer code needed. The `data-lake-connector` folder exists to make the data flow explicit and self-contained for this portfolio project.

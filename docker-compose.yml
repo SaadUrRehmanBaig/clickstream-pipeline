@@ -43,6 +43,50 @@ services:
     networks:
       - pipeline-net
 
+  # 3. Hadoop NameNode (HDFS Master)
+  namenode:
+    image: bde2020/hadoop-namenode:2.0.0-hadoop3.2.1-java8
+    container_name: namenode
+    ports:
+      - "9870:9870" # HDFS Web UI
+      - "9000:9000" # NameNode IPC port
+    environment:
+      - CLUSTER_NAME=test-cluster
+    env_file:
+      - ./hadoop.env
+    networks:
+      - pipeline-net
+
+  # 4. Hadoop DataNode (HDFS Storage Worker)
+  datanode:
+    image: bde2020/hadoop-datanode:2.0.0-hadoop3.2.1-java8
+    container_name: datanode
+    depends_on:
+      - namenode
+    env_file:
+      - ./hadoop.env
+    ports:
+      - "9864:9864"
+    networks:
+      - pipeline-net
+
+  # 5. Kafka-to-HDFS lightweight consumer
+  data-lake-connector:
+    build: ./data-lake-connector
+    container_name: data-lake-connector
+    environment:
+      - KAFKA_BROKER=kafka:9092
+      - HDFS_NAMENODE_URL=http://namenode:9870
+      - HDFS_RPC_HOST=namenode
+      - HDFS_RPC_PORT=9000
+    depends_on:
+      kafka:
+        condition: service_healthy
+      namenode:
+        condition: service_started
+    networks:
+      - pipeline-net
+
 networks:
   pipeline-net:
     driver: bridge
