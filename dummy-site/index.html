@@ -3,12 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Saad's Server</title>
+    <title>Test Page</title>
     <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-card: #1e293b;
+            --accent-primary: #38bdf8;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --success: #34d399;
+            --success-bg: rgba(52, 211, 153, 0.1);
+            --success-border: #059669;
+        }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #0f172a;
-            color: #e2e8f0;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -17,66 +27,60 @@
         }
         .container {
             text-align: center;
-            padding: 2.5rem;
-            max-width: 650px;
-            background: #1e293b;
+            padding: 3rem;
+            max-width: 700px;
+            background: var(--bg-card);
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
         }
         h1 {
-            color: #38bdf8;
-            font-size: 2rem;
-            margin-bottom: 1.5rem;
+            color: var(--accent-primary);
+            font-size: 2.2rem;
+            margin-bottom: 1rem;
+            letter-spacing: -0.025em;
         }
         p {
-            color: #94a3b8;
+            color: var(--text-muted);
             font-size: 1.1rem;
             margin: 1rem 0;
-            line-height: 1.5;
+            line-height: 1.6;
         }
-        .status-group {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.75rem;
+        .actions {
             margin-top: 2rem;
         }
-        .status-green {
-            display: inline-block;
-            padding: 0.5rem 1.2rem;
-            background: rgba(52, 211, 153, 0.1);
-            color: #34d399;
-            border: 1px solid #059669;
-            border-radius: 20px;
-            font-family: monospace;
-            font-size: 0.95rem;
-            font-weight: bold;
+        .btn {
+            background-color: var(--accent-primary);
+            color: #0f172a;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: opacity 0.2s;
         }
-        .status-amber {
-            display: inline-block;
-            padding: 0.5rem 1.2rem;
-            background: rgba(251, 191, 36, 0.1);
-            color: #fbbf24;
-            border: 1px solid #d97706;
-            border-radius: 20px;
-            font-family: monospace;
-            font-size: 0.95rem;
-            font-weight: bold;
+        .btn:hover {
+            opacity: 0.9;
         }
     </style>
-    <script src="/js/tracker.js" defer></script>
+    <script src="./js/tracker.js" defer></script>
 </head>
 <body>
     <div class="container">
-        <h1>Saad's Server</h1>
-
-        <p> Welcome to Saad’s server. Running on Linux, powered by custom scripts Saad wrote at 3 AM.</p>
-        <p> Saad can resolve any merge conflict or system failure, yet his love life is throwing a 404. Open-source heart listening for incoming pull requests in DMs...</p>
-
-        <div class="status-group">
-            <div class="status-green">● Server Status: Fully Operational</div>
-            <div class="status-amber">▲ Admin's Love Life: Unstable</div>
+        <h1>Test Site</h1>
+        <p>Welcome to the Test Site!</p>
+        <p>This page is designed to simulate user interactions and generate clickstream events for testing purposes.</p>
+        <p>Interact with this page to generate live clickstream payloads routed through Apache Kafka and processed via Apache Spark Structured Streaming.</p>
+        
+        <div class="actions">
+            <button class="btn" id="simulate-btn">Simulate User Interaction Event</button>
         </div>
     </div>
+    <script>
+        document.getElementById('simulate-btn').addEventListener('click', () => {
+            console.log("Simulated interaction event triggered.");
+        });
+    </script>
 </body>
 </html>
