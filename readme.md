@@ -1,8 +1,8 @@
-# Real-Time Clickstream Pipeline
+# Real-Time Clickstream Fraud Detector
 
-A complete data pipeline that ingests continuous user click events, stores raw data in a Data Lake, and processes historical data nightly for consumer trends.
+A data pipeline that ingests continuous user click events, stores raw data in a Data Lake, and runs both real-time and batch fraud detection over the stream.
 
-**Tech Stack:** Python FastAPI, Apache Kafka, Apache Storm, Apache Spark, HDFS
+**Tech Stack:** Python FastAPI, Apache Kafka, Apache Spark, HDFS
 
 ---
 
@@ -10,9 +10,9 @@ A complete data pipeline that ingests continuous user click events, stores raw d
 
 - **Data Lake / HDFS (Bronze Layer)** — Raw JSON clickstream logs land here first, partitioned by date using Hive-style directories (`year=/month=/day=`). Nothing is transformed; it's the source of truth.
 
-- **Apache Storm (Speed Layer / Silver)** — Consumes the live Kafka stream for real-time processing. If a user is performing malicious activity, Storm immediately flags and fires an alert (sub-second latency).
+- **Apache Spark Structured Streaming (Speed Layer / Silver)** — Consumes the live Kafka stream and detects fraud signals in near-real-time: click velocity per IP, bot-like timing patterns, and anomalous session behaviour. Alerts are pushed to a dedicated `fraud-alerts` Kafka topic.
 
-- **Apache Spark (Batch Layer / Gold)** — Runs daily scheduled jobs over historical data in HDFS to build recommendation models (e.g. "People who bought X also bought Y") and aggregate daily activity reports.
+- **Apache Spark Batch (Batch Layer / Gold)** — Runs daily jobs over historical Bronze data in HDFS to produce aggregated fraud reports, per-IP risk scores, and feature sets for downstream ML training.
 
 ---
 
@@ -32,8 +32,8 @@ A complete data pipeline that ingests continuous user click events, stores raw d
         │
    ┌────┴────────────────────────┐
    ▼                             ▼
-[ Apache Storm ]          [ Data Lake Connector ]
- Speed / Silver Layer      Kafka → HDFS consumer
+[ Spark Structured Streaming ] [ Data Lake Connector ]
+ Speed / Silver Layer            Kafka → HDFS consumer
                                 │
                                 ▼
                         [ HDFS / NameNode + DataNode ]
@@ -50,8 +50,8 @@ A complete data pipeline that ingests continuous user click events, stores raw d
 The pipeline is built incrementally across three layers:
 
 1. **Bronze** — Raw, unmodified events written to HDFS as NDJSON, partitioned by date.
-2. **Silver** — Real-time fraud detection and event enrichment via Apache Storm.
-3. **Gold** — Aggregated reports and ML features produced nightly by Apache Spark.
+2. **Silver** — Real-time fraud signal detection via Spark Structured Streaming (click velocity, timing anomalies, IP behaviour).
+3. **Gold** — Aggregated fraud reports, per-IP risk scores, and ML feature tables produced nightly by Spark Batch.
 
 ---
 
@@ -84,3 +84,5 @@ ssh -R 127.0.0.1:8080:localhost:8080 vps
 ```
 
 > **Note on production:** In a real deployment this connector would be replaced with Kafka Connect (HDFS Sink Connector) — no custom consumer code needed. The `data-lake-connector` folder exists to make the data flow explicit and self-contained for this portfolio project.
+
+**6.** The speed layer runs as a Spark Structured Streaming job. The `speed-layer` container acts as the driver, it builds the query plan and submits it to the master. The master schedules execution onto the worker, whose JVM loads `speed_layer.py` from the shared volume mount and runs the actual processing. For this dev setup there is a single worker node; in production the worker tier would scale horizontally across the cluster.

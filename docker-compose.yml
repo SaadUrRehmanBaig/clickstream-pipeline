@@ -1,5 +1,5 @@
 services:
-  # 1. Kafka Broker (KRaft Mode - No ZooKeeper)
+  # 1. Kafka Broker
   kafka:
     image: apache/kafka:3.8.0
     container_name: kafka
@@ -20,13 +20,31 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       CLUSTER_ID: 'Mk3O9EVhT82SrSIqIvZgog'
     networks:
-      - pipeline-net
+      - ingest-net  
+      - storage-net
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-  
+
+  init-kafka:
+    image: apache/kafka:3.8.0
+    container_name: init-kafka
+    depends_on:
+      kafka:
+        condition: service_healthy
+    networks:
+      - ingest-net
+      - storage-net
+    command: >
+      bash -c "
+      echo 'Waiting for Kafka to be ready...' &&
+      /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --topic clickstream-raw --partitions 1 --replication-factor 1 &&
+      /opt/kafka/bin/kafka-topics.sh --create --if-not-exists --bootstrap-server kafka:9092 --topic fraud-alerts --partitions 1 --replication-factor 1 &&
+      echo 'Kafka topics created successfully!'
+      "
+
   # 2. Ingestion Server
   ingestion-server:
     build: ./ingestion-server
@@ -41,7 +59,7 @@ services:
       kafka:
         condition: service_healthy
     networks:
-      - pipeline-net
+      - ingest-net
 
   # 3. Hadoop NameNode (HDFS Master)
   namenode:
@@ -55,7 +73,7 @@ services:
     env_file:
       - ./hadoop.env
     networks:
-      - pipeline-net
+      - storage-net
 
   # 4. Hadoop DataNode (HDFS Storage Worker)
   datanode:
@@ -68,7 +86,7 @@ services:
     ports:
       - "9864:9864"
     networks:
-      - pipeline-net
+      - storage-net
 
   # 5. Kafka-to-HDFS lightweight consumer
   data-lake-connector:
@@ -85,8 +103,60 @@ services:
       namenode:
         condition: service_started
     networks:
-      - pipeline-net
+      - storage-net
+
+  # 6. Spark cluster — single-node dev setup (master + worker)
+  spark-master:
+    build: ./spark
+    container_name: spark-master
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - "mkdir -p /opt/spark/logs && /opt/spark/sbin/start-master.sh && tail -f /opt/spark/logs/*"
+    ports:
+      - "8081:8080" 
+      - "7077:7077" 
+    networks:
+      - storage-net
+
+  spark-worker:
+    build: ./spark
+    container_name: spark-worker
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - "mkdir -p /opt/spark/logs && /opt/spark/sbin/start-worker.sh spark://spark-master:7077 && tail -f /opt/spark/logs/*"
+    environment:
+      - SPARK_WORKER_MEMORY=1G
+      - SPARK_WORKER_CORES=1
+    depends_on:
+      - spark-master
+    networks:
+      - storage-net
+
+  # 7. Speed layer
+  speed-layer:
+    build: ./spark
+    container_name: speed-layer
+    entrypoint: ["/opt/spark/bin/spark-submit"]
+    command:
+      - "--master"
+      - "spark://spark-master:7077"
+      - "/opt/spark-jobs/speed_layer.py"
+    environment:
+      - KAFKA_BROKER=kafka:9092
+    volumes:
+      - ./spark:/opt/spark-jobs
+    depends_on:
+      kafka:
+        condition: service_healthy
+      spark-master:
+        condition: service_started
+      init-kafka:
+        condition: service_completed_successfully
+    networks:
+      - storage-net
 
 networks:
-  pipeline-net:
+  ingest-net:
+    driver: bridge
+  storage-net:
     driver: bridge
