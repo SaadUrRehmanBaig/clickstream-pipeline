@@ -85,5 +85,6 @@ ssh -R 127.0.0.1:8080:localhost:8080 vps
 > **Note on production:** In a real deployment this connector would be replaced with Kafka Connect (HDFS Sink Connector) — no custom consumer code needed. The `data-lake-connector` folder exists to make the data flow explicit and self-contained for this portfolio project.
 
 **6.** The speed layer runs as a Spark Structured Streaming job. The `speed-layer` container acts as the driver, it builds the query plan and submits it to the master. The master schedules execution onto the worker, whose JVM loads `speed_layer.py` from the shared volume mount and runs the actual processing. For this dev setup there is a single worker node; in production the worker tier would scale horizontally across the cluster.
-----
+
+---
 > **Note on Production:** This is just a portfolio project. If this was to go to prod I would use Kubernetes or a cloud-managed servicefor infra as we would not deploy such project on compose. This setup exists purely to demonstrate proof of concept.
